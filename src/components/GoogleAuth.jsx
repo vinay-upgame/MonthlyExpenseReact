@@ -198,7 +198,7 @@ export default function GoogleAuth({ onAuthenticated }) {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-6 lg:p-8 mx-4">
         <h1 className="text-2xl font-bold mb-4 text-gray-800">Monthly Expense Tracker</h1>
         <p className="text-gray-600 mb-6">
           Sign in with Google to access your expense data stored in Google Sheets and Drive.
@@ -213,9 +213,16 @@ export default function GoogleAuth({ onAuthenticated }) {
         <button
           onClick={handleSignIn}
           disabled={isLoading}
-          className="w-full px-4 py-3 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-500 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 touch-target disabled:cursor-not-allowed"
         >
-          {isLoading ? 'Signing in...' : 'Sign in with Google'}
+          {isLoading ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></span>
+              Signing in...
+            </span>
+          ) : (
+            '🔐 Sign in with Google'
+          )}
         </button>
 
         {!GOOGLE_CLIENT_ID && (

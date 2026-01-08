@@ -91,13 +91,13 @@ export default function DailyExpense() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <h1 className="text-3xl font-bold mb-6 text-gray-800">Daily Expense Entry</h1>
+    <div className="container mx-auto px-4 py-4 lg:py-8 max-w-2xl">
+      <h1 className="text-2xl lg:text-3xl font-bold mb-4 lg:mb-6 text-gray-800">Daily Expense Entry</h1>
 
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-2xl shadow-lg p-4 lg:p-6 mb-6">
         <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="mb-5">
+            <label htmlFor="date" className="block text-sm font-semibold text-gray-700 mb-2">
               Date
             </label>
             <input
@@ -105,13 +105,13 @@ export default function DailyExpense() {
               id="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-3 text-base border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all touch-target"
               required
             />
           </div>
 
-          <div className="mb-4">
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="mb-5">
+            <label htmlFor="description" className="block text-sm font-semibold text-gray-700 mb-2">
               Description
             </label>
             <input
@@ -120,13 +120,13 @@ export default function DailyExpense() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="e.g., Tea expense, Lunch, etc."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-3 text-base border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all touch-target"
               required
             />
           </div>
 
-          <div className="mb-4">
-            <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="mb-5">
+            <label htmlFor="amount" className="block text-sm font-semibold text-gray-700 mb-2">
               Amount (₹)
             </label>
             <input
@@ -134,55 +134,66 @@ export default function DailyExpense() {
               id="amount"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-3 text-base border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all touch-target"
               step="0.01"
               min="0"
               required
             />
           </div>
 
-          <div className="mb-4">
-            <label htmlFor="file" className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="mb-5">
+            <label htmlFor="file" className="block text-sm font-semibold text-gray-700 mb-2">
               Attachment (Screenshot/Invoice) - Optional
             </label>
-            <input
-              type="file"
-              id="file"
-              onChange={handleFileChange}
-              accept="image/*,.pdf"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            {file && (
-              <p className="mt-2 text-sm text-gray-600">Selected: {file.name}</p>
-            )}
+            <div className="relative">
+              <input
+                type="file"
+                id="file"
+                onChange={handleFileChange}
+                accept="image/*,.pdf"
+                className="w-full px-4 py-3 text-base border-2 border-dashed border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all touch-target"
+              />
+              {file && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm font-medium text-blue-800">📎 Selected: {file.name}</p>
+                </div>
+              )}
+            </div>
           </div>
 
           {uploadProgress && (
-            <div className="mb-4 p-3 bg-blue-100 text-blue-700 rounded">
-              {uploadProgress}
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl">
+              <p className="font-medium">{uploadProgress}</p>
             </div>
           )}
 
           {message.text && (
             <div
-              className={`mb-4 p-3 rounded ${
+              className={`mb-4 p-4 rounded-xl border ${
                 message.type === 'success'
-                  ? 'bg-green-100 text-green-700'
+                  ? 'bg-green-50 border-green-200 text-green-700'
                   : message.type === 'error'
-                  ? 'bg-red-100 text-red-700'
-                  : 'bg-yellow-100 text-yellow-700'
+                  ? 'bg-red-50 border-red-200 text-red-700'
+                  : 'bg-yellow-50 border-yellow-200 text-yellow-700'
               }`}
             >
-              {message.text}
+              <p className="font-medium">{message.text}</p>
             </div>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
+            className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-500 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 touch-target"
           >
-            {loading ? 'Saving...' : 'Save Expense'}
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></span>
+                Saving...
+              </span>
+            ) : (
+              '💾 Save Expense'
+            )}
           </button>
         </form>
       </div>

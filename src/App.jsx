@@ -219,15 +219,18 @@ function App() {
 
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-gray-100">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
         <Navigation onSignOut={handleSignOut} />
-        <Routes>
-          <Route path="/" element={<Navigate to="/monthly-balance" replace />} />
-          <Route path="/monthly-balance" element={<MonthlyBalance />} />
-          <Route path="/daily-expense" element={<DailyExpense />} />
-          <Route path="/weekly-payment" element={<WeeklyPayment />} />
-          <Route path="/report" element={<MonthlyReport />} />
-        </Routes>
+        {/* Add bottom padding on mobile to account for bottom nav */}
+        <div className="pb-16 lg:pb-0">
+          <Routes>
+            <Route path="/" element={<Navigate to="/monthly-balance" replace />} />
+            <Route path="/monthly-balance" element={<MonthlyBalance />} />
+            <Route path="/daily-expense" element={<DailyExpense />} />
+            <Route path="/weekly-payment" element={<WeeklyPayment />} />
+            <Route path="/report" element={<MonthlyReport />} />
+          </Routes>
+        </div>
       </div>
     </BrowserRouter>
   );
