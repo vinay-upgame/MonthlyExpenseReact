@@ -105,12 +105,18 @@ function App() {
             
             // If user was authenticated, restore token from localStorage
             if (wasAuthenticated) {
-              // Ensure token is valid (refresh if needed)
+              // Ensure token is valid (refresh if needed, including when expired)
               let token = await tokenRefresh.ensureValidToken();
-              
               if (!token) {
-                // Try to get token from storage
                 token = storage.getToken();
+              }
+              if (!token) {
+                // Last chance: try silent refresh once (e.g. GIS prompt: 'none')
+                try {
+                  token = await tokenRefresh.refreshAccessToken();
+                } catch (e) {
+                  console.warn('Final token refresh attempt failed:', e);
+                }
               }
               
               if (token && token.access_token) {

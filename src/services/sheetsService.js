@@ -3,6 +3,7 @@
  */
 
 import { storage } from '../utils/storage.js';
+import { executeWithTokenRetry } from './tokenRefresh.js';
 import { openDB } from 'idb';
 
 const DISCOVERY_DOCS = ['https://sheets.googleapis.com/$discovery/rest?version=v4'];
@@ -140,47 +141,40 @@ const searchExistingSpreadsheet = async (searchTitle = SPREADSHEET_NAME) => {
       return null;
     }
 
-    // Search in Google Drive for spreadsheets with the app name
-    const response = await window.gapi.client.drive.files.list({
-      q: `name='${searchTitle}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`,
-      fields: 'files(id, name, modifiedTime)',
-      orderBy: 'modifiedTime desc',
-      pageSize: 10,
-    });
+    // Search in Google Drive for spreadsheets with the app name (with 401 retry)
+    const response = await executeWithTokenRetry(() =>
+      window.gapi.client.drive.files.list({
+        q: `name='${searchTitle}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`,
+        fields: 'files(id, name, modifiedTime)',
+        orderBy: 'modifiedTime desc',
+        pageSize: 10,
+      })
+    );
 
     if (response.result.files && response.result.files.length > 0) {
-      // Get the most recently modified spreadsheet
       const spreadsheet = response.result.files[0];
       const spreadsheetId = spreadsheet.id;
-      
-      // Verify it has the required sheets
       try {
-        const sheetResponse = await window.gapi.client.sheets.spreadsheets.get({
-          spreadsheetId: spreadsheetId,
-        });
-        
+        const sheetResponse = await executeWithTokenRetry(() =>
+          window.gapi.client.sheets.spreadsheets.get({ spreadsheetId })
+        );
         const sheetTitles = sheetResponse.result.sheets.map(s => s.properties.title);
         const requiredSheets = ['Months', 'DailyExpenses', 'WeeklyPayments', 'Settings'];
         const hasAllSheets = requiredSheets.every(sheet => sheetTitles.includes(sheet));
-        
         if (hasAllSheets) {
           console.log('✓ Found existing spreadsheet:', spreadsheetId);
-          
-          // Try to get the stored ID from Settings (in case spreadsheet was renamed)
           const storedId = await getSpreadsheetIdFromSettings(spreadsheetId);
           if (storedId && storedId !== spreadsheetId) {
-            // If there's a different ID stored, verify that one exists
             try {
-              await window.gapi.client.sheets.spreadsheets.get({
-                spreadsheetId: storedId,
-              });
+              await executeWithTokenRetry(() =>
+                window.gapi.client.sheets.spreadsheets.get({ spreadsheetId: storedId })
+              );
               console.log('✓ Using stored spreadsheet ID from Settings:', storedId);
               return storedId;
             } catch {
               console.log('Stored ID not accessible, using found spreadsheet');
             }
           }
-          
           return spreadsheetId;
         } else {
           console.log('Found spreadsheet but missing required sheets');
@@ -218,7 +212,8 @@ const getSpreadsheetIdFromSettings = async (spreadsheetId) => {
  */
 export const createSpreadsheet = async (title = SPREADSHEET_NAME) => {
   try {
-    const response = await window.gapi.client.sheets.spreadsheets.create({
+    const response = await executeWithTokenRetry(() =>
+      window.gapi.client.sheets.spreadsheets.create({
       resource: {
         properties: {
           title: title,
@@ -230,7 +225,7 @@ export const createSpreadsheet = async (title = SPREADSHEET_NAME) => {
           { properties: { title: 'Settings' } },
         ],
       },
-    });
+    }));
 
     const spreadsheetId = response.result.spreadsheetId;
 
@@ -254,45 +249,19 @@ export const createSpreadsheet = async (title = SPREADSHEET_NAME) => {
  */
 const setSheetHeaders = async (spreadsheetId) => {
   try {
-    // Months sheet headers
-    await window.gapi.client.sheets.spreadsheets.values.update({
-      spreadsheetId: spreadsheetId,
-      range: 'Months!A1:D1',
-      valueInputOption: 'RAW',
-      resource: {
-        values: [['monthKey', 'initialBalance', 'reimbursements', 'carryForward']],
-      },
-    });
-
-    // DailyExpenses sheet headers
-    await window.gapi.client.sheets.spreadsheets.values.update({
-      spreadsheetId: spreadsheetId,
-      range: 'DailyExpenses!A1:G1',
-      valueInputOption: 'RAW',
-      resource: {
-        values: [['id', 'monthKey', 'date', 'description', 'amount', 'attachmentUrl', 'driveFileId']],
-      },
-    });
-
-    // WeeklyPayments sheet headers
-    await window.gapi.client.sheets.spreadsheets.values.update({
-      spreadsheetId: spreadsheetId,
-      range: 'WeeklyPayments!A1:E1',
-      valueInputOption: 'RAW',
-      resource: {
-        values: [['id', 'monthKey', 'weekEndDate', 'amount', 'description']],
-      },
-    });
-
-    // Settings sheet headers
-    await window.gapi.client.sheets.spreadsheets.values.update({
-      spreadsheetId: spreadsheetId,
-      range: 'Settings!A1:B1',
-      valueInputOption: 'RAW',
-      resource: {
-        values: [['key', 'value']],
-      },
-    });
+    const upd = (range, values) =>
+      executeWithTokenRetry(() =>
+        window.gapi.client.sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range,
+          valueInputOption: 'RAW',
+          resource: { values: [values] },
+        })
+      );
+    await upd('Months!A1:D1', ['monthKey', 'initialBalance', 'reimbursements', 'carryForward']);
+    await upd('DailyExpenses!A1:G1', ['id', 'monthKey', 'date', 'description', 'amount', 'attachmentUrl', 'driveFileId']);
+    await upd('WeeklyPayments!A1:E1', ['id', 'monthKey', 'weekEndDate', 'amount', 'description']);
+    await upd('Settings!A1:B1', ['key', 'value']);
   } catch (error) {
     console.error('Error setting sheet headers:', error);
     throw error;
@@ -311,11 +280,10 @@ export const getOrCreateSpreadsheet = async () => {
   let spreadsheetId = storage.getSpreadsheetId();
 
   if (spreadsheetId) {
-    // Verify spreadsheet exists and is accessible
     try {
-      const response = await window.gapi.client.sheets.spreadsheets.get({
-        spreadsheetId: spreadsheetId,
-      });
+      const response = await executeWithTokenRetry(() =>
+        window.gapi.client.sheets.spreadsheets.get({ spreadsheetId })
+      );
       
       // If we get here, spreadsheet exists and is accessible
       // Verify it has the correct name
@@ -447,17 +415,16 @@ export const loadAllData = async () => {
  */
 const readSheetData = async (spreadsheetId, sheetName) => {
   try {
-    // Check if gapi is available
     if (!isAPIAvailable()) {
       console.warn('Google API not available, returning empty data');
       return [];
     }
-
-    const response = await window.gapi.client.sheets.spreadsheets.values.get({
-      spreadsheetId: spreadsheetId,
-      range: `${sheetName}!A:Z`,
-    });
-
+    const response = await executeWithTokenRetry(() =>
+      window.gapi.client.sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `${sheetName}!A:Z`,
+      })
+    );
     return response.result.values || [];
   } catch (error) {
     console.error(`Error reading ${sheetName}:`, error);
@@ -577,15 +544,15 @@ const appendRow = async (spreadsheetId, sheetName, values) => {
       throw new Error('Google API not available');
     }
 
-    await window.gapi.client.sheets.spreadsheets.values.append({
-      spreadsheetId: spreadsheetId,
-      range: `${sheetName}!A:Z`,
-      valueInputOption: 'RAW',
-      insertDataOption: 'INSERT_ROWS',
-      resource: {
-        values: [values],
-      },
-    });
+    await executeWithTokenRetry(() =>
+      window.gapi.client.sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: `${sheetName}!A:Z`,
+        valueInputOption: 'RAW',
+        insertDataOption: 'INSERT_ROWS',
+        resource: { values: [values] },
+      })
+    );
   } catch (error) {
     console.error(`Error appending to ${sheetName}:`, error);
     throw error;
@@ -618,13 +585,14 @@ export const saveMonth = async (monthData) => {
     ];
 
     if (existingIndex > 0) {
-      // Update existing row
-      await window.gapi.client.sheets.spreadsheets.values.update({
-        spreadsheetId: spreadsheetId,
-        range: `Months!A${existingIndex + 1}:D${existingIndex + 1}`,
-        valueInputOption: 'RAW',
-        resource: { values: [values] },
-      });
+      await executeWithTokenRetry(() =>
+        window.gapi.client.sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range: `Months!A${existingIndex + 1}:D${existingIndex + 1}`,
+          valueInputOption: 'RAW',
+          resource: { values: [values] },
+        })
+      );
     } else {
       // Append new row
       await appendRow(spreadsheetId, 'Months', values);
@@ -758,14 +726,15 @@ export const updateDailyExpense = async (expense) => {
       expense.driveFileId || '',
     ];
 
-    await window.gapi.client.sheets.spreadsheets.values.update({
-      spreadsheetId: spreadsheetId,
-      range: `DailyExpenses!A${rowIndex}:G${rowIndex}`,
-      valueInputOption: 'RAW',
-      resource: { values: [values] },
-    });
+    await executeWithTokenRetry(() =>
+      window.gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `DailyExpenses!A${rowIndex}:G${rowIndex}`,
+        valueInputOption: 'RAW',
+        resource: { values: [values] },
+      })
+    );
 
-    // Update cache
     const db = await initDB();
     await db.put('dailyExpenses', expense);
     storage.setLastSync(Date.now());
@@ -794,26 +763,22 @@ export const deleteDailyExpense = async (expenseId) => {
       throw new Error('Expense not found');
     }
 
-    // Delete the row
-    await window.gapi.client.sheets.spreadsheets.batchUpdate({
-      spreadsheetId: spreadsheetId,
-      resource: {
-        requests: [
-          {
-            deleteDimension: {
-              range: {
-                sheetId: await getSheetId(spreadsheetId, 'DailyExpenses'),
-                dimension: 'ROWS',
-                startIndex: rowIndex - 1,
-                endIndex: rowIndex,
+    const sheetId = await getSheetId(spreadsheetId, 'DailyExpenses');
+    await executeWithTokenRetry(() =>
+      window.gapi.client.sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        resource: {
+          requests: [
+            {
+              deleteDimension: {
+                range: { sheetId, dimension: 'ROWS', startIndex: rowIndex - 1, endIndex: rowIndex },
               },
             },
-          },
-        ],
-      },
-    });
+          ],
+        },
+      })
+    );
 
-    // Update cache
     const db = await initDB();
     await db.delete('dailyExpenses', expenseId);
     storage.setLastSync(Date.now());
@@ -850,14 +815,15 @@ export const updateWeeklyPayment = async (payment) => {
       payment.description || '',
     ];
 
-    await window.gapi.client.sheets.spreadsheets.values.update({
-      spreadsheetId: spreadsheetId,
-      range: `WeeklyPayments!A${rowIndex}:E${rowIndex}`,
-      valueInputOption: 'RAW',
-      resource: { values: [values] },
-    });
+    await executeWithTokenRetry(() =>
+      window.gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `WeeklyPayments!A${rowIndex}:E${rowIndex}`,
+        valueInputOption: 'RAW',
+        resource: { values: [values] },
+      })
+    );
 
-    // Update cache
     const db = await initDB();
     await db.put('weeklyPayments', payment);
     storage.setLastSync(Date.now());
@@ -886,26 +852,22 @@ export const deleteWeeklyPayment = async (paymentId) => {
       throw new Error('Payment not found');
     }
 
-    // Delete the row
-    await window.gapi.client.sheets.spreadsheets.batchUpdate({
-      spreadsheetId: spreadsheetId,
-      resource: {
-        requests: [
-          {
-            deleteDimension: {
-              range: {
-                sheetId: await getSheetId(spreadsheetId, 'WeeklyPayments'),
-                dimension: 'ROWS',
-                startIndex: rowIndex - 1,
-                endIndex: rowIndex,
+    const sheetId = await getSheetId(spreadsheetId, 'WeeklyPayments');
+    await executeWithTokenRetry(() =>
+      window.gapi.client.sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        resource: {
+          requests: [
+            {
+              deleteDimension: {
+                range: { sheetId, dimension: 'ROWS', startIndex: rowIndex - 1, endIndex: rowIndex },
               },
             },
-          },
-        ],
-      },
-    });
+          ],
+        },
+      })
+    );
 
-    // Update cache
     const db = await initDB();
     await db.delete('weeklyPayments', paymentId);
     storage.setLastSync(Date.now());
@@ -920,11 +882,12 @@ export const deleteWeeklyPayment = async (paymentId) => {
  */
 const getSheetId = async (spreadsheetId, sheetName) => {
   try {
-    const response = await window.gapi.client.sheets.spreadsheets.get({
-      spreadsheetId: spreadsheetId,
-      fields: 'sheets.properties(sheetId,title)',
-    });
-    
+    const response = await executeWithTokenRetry(() =>
+      window.gapi.client.sheets.spreadsheets.get({
+        spreadsheetId,
+        fields: 'sheets.properties(sheetId,title)',
+      })
+    );
     const sheet = response.result.sheets.find(s => s.properties.title === sheetName);
     return sheet ? sheet.properties.sheetId : null;
   } catch (error) {

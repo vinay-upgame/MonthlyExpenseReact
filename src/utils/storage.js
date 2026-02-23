@@ -91,19 +91,19 @@ const storage = {
       return null;
     }
 
-    // Check if token is expired or will expire soon (within 5 minutes)
+    // Check if token is expired or will expire soon (within 15 minutes)
     const expiryTime = expiry ? parseInt(expiry, 10) : 0;
-    const fiveMinutesFromNow = Date.now() + (5 * 60 * 1000);
+    const fifteenMinutesFromNow = Date.now() + (15 * 60 * 1000);
     
     if (expiryTime > 0 && Date.now() > expiryTime) {
-      // Token expired
+      // Token expired - return null so caller can attempt refresh
       return null;
     }
 
     return {
       access_token: token,
       expires_in: expiry ? Math.floor((expiryTime - Date.now()) / 1000) : 3600,
-      needsRefresh: expiryTime > 0 && fiveMinutesFromNow > expiryTime, // Refresh if expires in < 5 min
+      needsRefresh: expiryTime > 0 && fifteenMinutesFromNow > expiryTime, // Refresh if expires in < 15 min
     };
   },
 
