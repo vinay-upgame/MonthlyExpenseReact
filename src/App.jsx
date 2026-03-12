@@ -105,68 +105,20 @@ function App() {
             
             // If user was authenticated, restore token from localStorage
             if (wasAuthenticated) {
-              // Ensure token is valid (refresh if needed, including when expired)
-              let token = await tokenRefresh.ensureValidToken();
-              if (!token) {
-                token = storage.getToken();
-              }
-              if (!token) {
-                // Last chance: try silent refresh once (e.g. GIS prompt: 'none')
-                try {
-                  token = await tokenRefresh.refreshAccessToken();
-                } catch (e) {
-                  console.warn('Final token refresh attempt failed:', e);
-                }
-              }
-              
+              // Get stored token — even if expired, we restore it to gapi so the
+              // app can start immediately. The token refresh runs in the background
+              // and API calls use executeWithTokenRetry to handle 401s gracefully.
+              const token = storage.getToken();
+
               if (token && token.access_token) {
-                // Restore token to gapi client
                 window.gapi.client.setToken(token);
-                console.log('✓ Token restored from localStorage');
-                
-                // Verify token is still valid
-                try {
-                  const spreadsheetId = storage.getSpreadsheetId();
-                  if (spreadsheetId) {
-                    await window.gapi.client.sheets.spreadsheets.get({
-                      spreadsheetId: spreadsheetId,
-                    });
-                  } else {
-                    // No spreadsheet ID, but token is valid - just verify API works
-                    await window.gapi.client.sheets.spreadsheets.list({
-                      pageSize: 1,
-                    });
-                  }
-                  // Token is valid
-                  setIsAuthenticated(true);
-                  console.log('✓ API initialized with restored token');
-                  
-                  // Initialize automatic token refresh
-                  tokenRefresh.initTokenRefresh();
-                } catch (error) {
-                  // Token might be expired, try to refresh
-                  console.log('Token validation failed, attempting refresh...', error);
-                  try {
-                    const refreshedToken = await tokenRefresh.refreshAccessToken();
-                    if (refreshedToken && refreshedToken.access_token) {
-                      setIsAuthenticated(true);
-                      console.log('✓ Token refreshed and validated');
-                      tokenRefresh.initTokenRefresh();
-                    } else {
-                      throw new Error('Token refresh failed');
-                    }
-                  } catch (refreshError) {
-                    console.log('Token refresh failed, need to re-authenticate:', refreshError);
-                    storage.clearToken();
-                    storage.setIsAuthenticated(false);
-                    if (window.gapi?.client) {
-                      window.gapi.client.setToken('');
-                    }
-                    setIsAuthenticated(false);
-                  }
-                }
+                console.log('✓ Token restored from localStorage', token.isExpired ? '(expired — will refresh in background)' : '');
+                setIsAuthenticated(true);
+
+                // Kick off background refresh; it uses silent GIS if token is expired
+                tokenRefresh.initTokenRefresh();
               } else {
-                // No saved token found
+                // No token at all
                 console.log('No saved token found, need to re-authenticate');
                 storage.setIsAuthenticated(false);
                 setIsAuthenticated(false);
