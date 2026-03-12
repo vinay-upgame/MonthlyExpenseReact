@@ -86,24 +86,23 @@ const storage = {
   getToken: () => {
     const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     const expiry = localStorage.getItem(STORAGE_KEYS.TOKEN_EXPIRY);
-    
+
     if (!token) {
       return null;
     }
 
-    // Check if token is expired or will expire soon (within 15 minutes)
     const expiryTime = expiry ? parseInt(expiry, 10) : 0;
-    const fifteenMinutesFromNow = Date.now() + (15 * 60 * 1000);
-    
-    if (expiryTime > 0 && Date.now() > expiryTime) {
-      // Token expired - return null so caller can attempt refresh
-      return null;
-    }
+    const now = Date.now();
+    const fifteenMinutesFromNow = now + (15 * 60 * 1000);
+    const isExpired = expiryTime > 0 && now > expiryTime;
 
+    // Always return the token (even if expired) so callers can restore it to gapi.
+    // Callers check isExpired / needsRefresh to decide whether to refresh.
     return {
       access_token: token,
-      expires_in: expiry ? Math.floor((expiryTime - Date.now()) / 1000) : 3600,
-      needsRefresh: expiryTime > 0 && fifteenMinutesFromNow > expiryTime, // Refresh if expires in < 15 min
+      expires_in: expiry ? Math.floor((expiryTime - now) / 1000) : 3600,
+      isExpired,
+      needsRefresh: isExpired || (expiryTime > 0 && fifteenMinutesFromNow > expiryTime),
     };
   },
 

@@ -93,38 +93,34 @@ export const refreshAccessToken = async () => {
 
 /**
  * Check if token needs refresh and refresh if needed.
- * When token is expired or missing, always try refresh (including silent GIS refresh).
+ * Returns a valid token object, or null if fully unauthenticated.
+ * On refresh failure for an expired token, returns the expired token so gapi
+ * can still be set — actual API calls handle 401s via executeWithTokenRetry.
  */
 export const ensureValidToken = async () => {
   try {
     const token = storage.getToken();
-    
-    // No valid token (expired or missing) - always try to refresh
+
     if (!token) {
-      if (storage.getIsAuthenticated()) {
-        console.log('No valid token, attempting refresh (silent or refresh_token)...');
-        try {
-          return await refreshAccessToken();
-        } catch (error) {
-          console.warn('Token refresh failed:', error);
-          return null;
-        }
-      }
+      // No token stored at all — cannot continue without login
       return null;
     }
 
-    // If token expires soon (within 15 minutes), refresh proactively
-    if (token.needsRefresh) {
-      console.log('Token expires soon, refreshing proactively...');
-      try {
-        return await refreshAccessToken();
-      } catch (error) {
-        console.warn('Proactive refresh failed, using existing token:', error);
-        return token;
-      }
+    // Token is still valid and not expiring soon
+    if (!token.needsRefresh) {
+      return token;
     }
 
-    return token;
+    // Token is expired or expiring — attempt background refresh
+    console.log(token.isExpired ? 'Token expired, attempting silent refresh...' : 'Token expiring soon, refreshing proactively...');
+    try {
+      return await refreshAccessToken();
+    } catch (error) {
+      console.warn('Token refresh failed:', error);
+      // On failure: return expired token so gapi.client stays set.
+      // The next real API call will get a 401 and executeWithTokenRetry will handle it.
+      return token;
+    }
   } catch (error) {
     console.error('Error ensuring valid token:', error);
     return null;
