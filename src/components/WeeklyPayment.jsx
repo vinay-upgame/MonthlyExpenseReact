@@ -2,6 +2,7 @@ import { useState } from 'react';
 import * as sheetsService from '../services/sheetsService.js';
 import * as syncService from '../services/syncService.js';
 import { getCurrentMonthKey, getWeekEndDate, formatDate } from '../utils/dateUtils.js';
+import { handleAuthError } from '../utils/auth.js';
 import TransactionList from './TransactionList.jsx';
 
 export default function WeeklyPayment() {
@@ -49,6 +50,10 @@ export default function WeeklyPayment() {
       // Trigger refresh of transaction list
       setRefreshKey(prev => prev + 1);
     } catch (error) {
+      if (error?.authFailed) {
+        handleAuthError();
+        return;
+      }
       console.error('Error saving payment:', error);
       setMessage({ type: 'error', text: error.message || 'Failed to save weekly payment' });
     } finally {

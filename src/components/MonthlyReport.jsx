@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import * as sheetsService from '../services/sheetsService.js';
 import * as csvExport from '../services/csvExport.js';
 import { getCurrentMonthKey, getMonthName } from '../utils/dateUtils.js';
+import { handleAuthError } from '../utils/auth.js';
 
 export default function MonthlyReport() {
   const [monthKey, setMonthKey] = useState(getCurrentMonthKey());
@@ -20,7 +21,7 @@ export default function MonthlyReport() {
     try {
       const allData = await sheetsService.loadAllData();
       setData(allData);
-      
+
       // Check if we're using cached data (offline mode)
       // If Google API is not available, we're likely offline or API not loaded
       const isAPIAvailable = !!(window.gapi && window.gapi.client && window.gapi.client.sheets);
@@ -28,6 +29,10 @@ export default function MonthlyReport() {
         setIsOffline(true);
       }
     } catch (error) {
+      if (error?.authFailed) {
+        handleAuthError();
+        return;
+      }
       console.error('Error loading data:', error);
       setIsOffline(true);
     } finally {

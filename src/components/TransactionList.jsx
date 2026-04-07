@@ -3,6 +3,7 @@ import * as sheetsService from '../services/sheetsService.js';
 import * as driveService from '../services/driveService.js';
 import * as syncService from '../services/syncService.js';
 import { formatDate } from '../utils/dateUtils.js';
+import { handleAuthError } from '../utils/auth.js';
 
 export default function TransactionList({ type, monthKey, onRefresh }) {
   const [transactions, setTransactions] = useState([]);
@@ -26,6 +27,10 @@ export default function TransactionList({ type, monthKey, onRefresh }) {
         setTransactions(filtered.sort((a, b) => new Date(b.weekEndDate) - new Date(a.weekEndDate)));
       }
     } catch (error) {
+      if (error?.authFailed) {
+        handleAuthError();
+        return;
+      }
       console.error('Error loading transactions:', error);
     } finally {
       setLoading(false);
@@ -51,6 +56,10 @@ export default function TransactionList({ type, monthKey, onRefresh }) {
       if (onRefresh) onRefresh();
       setDeleteConfirm(null);
     } catch (error) {
+      if (error?.authFailed) {
+        handleAuthError();
+        return;
+      }
       console.error('Error deleting transaction:', error);
       alert('Failed to delete transaction: ' + error.message);
     }
@@ -320,6 +329,10 @@ function EditTransactionModal({ type, transaction, onClose }) {
         onClose();
       }, 1000);
     } catch (error) {
+      if (error?.authFailed) {
+        handleAuthError();
+        return;
+      }
       console.error('Error updating transaction:', error);
       setMessage({ type: 'error', text: error.message || 'Failed to update transaction' });
     } finally {

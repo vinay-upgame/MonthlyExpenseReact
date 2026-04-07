@@ -113,6 +113,24 @@ function App() {
               if (token && token.access_token) {
                 window.gapi.client.setToken(token);
                 console.log('✓ Token restored from localStorage', token.isExpired ? '(expired — will refresh in background)' : '');
+
+                // If token is expired, refresh it BEFORE marking user as authenticated
+                if (token.isExpired) {
+                  console.log('Token expired, attempting refresh before loading app...');
+                  try {
+                    await tokenRefresh.refreshAccessToken();
+                    console.log('✓ Token refreshed successfully');
+                  } catch (refreshError) {
+                    console.warn('Failed to refresh expired token, requiring re-authentication:', refreshError);
+                    // Clear auth state and require user to sign in again
+                    storage.setIsAuthenticated(false);
+                    storage.clearToken();
+                    setIsAuthenticated(false);
+                    setIsLoading(false);
+                    return;
+                  }
+                }
+
                 setIsAuthenticated(true);
 
                 // Kick off background refresh; it uses silent GIS if token is expired

@@ -110,7 +110,7 @@ export default function GoogleAuth({ onAuthenticated }) {
 
       // Request access token for both Drive and Sheets in one request
       // drive.readonly is needed to search for existing spreadsheets
-      // Using access_type: 'offline' and prompt: 'consent' to get refresh token
+      // access_type: 'offline' ensures we get a refresh token for long-term access
       const tokenClient = window.google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_CLIENT_ID,
         scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/spreadsheets',
@@ -134,12 +134,16 @@ export default function GoogleAuth({ onAuthenticated }) {
           // Set token for gapi client
           window.gapi.client.setToken(tokenResponse);
           
-          // Log token response to check for refresh_token
+          // Log token response to verify refresh_token is received
           console.log('Token response:', {
             hasAccessToken: !!tokenResponse.access_token,
             hasRefreshToken: !!tokenResponse.refresh_token,
             expiresIn: tokenResponse.expires_in,
           });
+
+          // IMPORTANT: On first login with access_type: 'offline', Google returns a refresh_token
+          // On subsequent logins, Google may NOT return refresh_token again (this is normal)
+          // The refresh_token is only returned once per grant unless the user revokes access
           
           // Save token to localStorage for persistence (including refresh token if available)
           storage.saveToken(tokenResponse);
@@ -159,10 +163,12 @@ export default function GoogleAuth({ onAuthenticated }) {
         },
       });
 
-      // Request token with consent to potentially get refresh token
-      // Note: Google Identity Services may not always provide refresh_token
-      // but will handle automatic refresh if user stays logged into Google
-      tokenClient.requestAccessToken({ prompt: 'consent' });
+      // Request token with consent and offline access to get refresh token
+      // access_type: 'offline' is required to receive a refresh_token
+      tokenClient.requestAccessToken({
+        prompt: 'consent',
+        access_type: 'offline'
+      });
     } catch (err) {
       console.error('Error signing in:', err);
       setError(err.message || 'Failed to sign in. Please try again.');

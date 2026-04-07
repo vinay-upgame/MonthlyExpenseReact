@@ -398,6 +398,10 @@ export const loadAllData = async () => {
 
     return { months, dailyExpenses, weeklyPayments };
   } catch (error) {
+    // Check for auth failure - propagate it so UI can handle re-authentication
+    if (error?.authFailed) {
+      throw error;
+    }
     console.error('Error loading data:', error);
     // Return cached data if available
     try {
