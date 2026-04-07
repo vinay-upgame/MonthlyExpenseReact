@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="0;url=/MonthlyExpenseReact/" />
+  <title>Redirecting...</title>
+  <script>
+    // Single Page Apps need all routes to redirect to index.html
+    // React Router will then handle the route client-side
+    const path = window.location.pathname;
+    const search = window.location.search;
+    const hash = window.location.hash;
+
+    // Remove /MonthlyExpenseReact prefix if present for proper reconstruction
+    const cleanPath = path.replace(/^\/MonthlyExpenseReact/, '');
+
+    // Use history.replaceState to set the correct path without reload
+    const target = '/MonthlyExpenseReact/' + (cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath) + search + hash;
+    window.location.replace(target);
+  </script>
+</head>
+<body>
+  <p>Redirecting to <a href="/MonthlyExpenseReact/">homepage</a>...</p>
+</body>
+</html>
