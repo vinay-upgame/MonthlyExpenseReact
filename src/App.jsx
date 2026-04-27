@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import GoogleAuth from './components/GoogleAuth';
 import Navigation from './components/Navigation';
 import MonthlyBalance from './components/MonthlyBalance';
 import DailyExpense from './components/DailyExpense';
 import WeeklyPayment from './components/WeeklyPayment';
 import MonthlyReport from './components/MonthlyReport';
+import PrivacyPolicy from './components/PrivacyPolicy';
+import TermsOfService from './components/TermsOfService';
+import Home from './components/Home';
 import * as syncService from './services/syncService.js';
 import * as driveService from './services/driveService.js';
 import * as sheetsService from './services/sheetsService.js';
@@ -166,6 +169,33 @@ function App() {
     initializeAPI();
   }, []);
 
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/terms-of-service" element={<TermsOfService />} />
+        <Route
+          path="*"
+          element={
+            <AppShell
+              isLoading={isLoading}
+              isAuthenticated={isAuthenticated}
+              apiReady={apiReady}
+              onAuthenticated={handleAuthenticated}
+              onSignOut={handleSignOut}
+            />
+          }
+        />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+function AppShell({ isLoading, isAuthenticated, apiReady, onAuthenticated, onSignOut }) {
+  // Preserve location so deep links survive the auth gate
+  useLocation();
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -178,10 +208,9 @@ function App() {
   }
 
   if (!isAuthenticated) {
-    return <GoogleAuth onAuthenticated={handleAuthenticated} />;
+    return <GoogleAuth onAuthenticated={onAuthenticated} />;
   }
 
-  // Only show app when API is ready (or if no client ID configured)
   if (!apiReady && GOOGLE_CLIENT_ID) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -194,21 +223,18 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-        <Navigation onSignOut={handleSignOut} />
-        {/* Add bottom padding on mobile to account for bottom nav */}
-        <div className="pb-16 lg:pb-0">
-          <Routes>
-            <Route path="/" element={<Navigate to="/monthly-balance" replace />} />
-            <Route path="/monthly-balance" element={<MonthlyBalance />} />
-            <Route path="/daily-expense" element={<DailyExpense />} />
-            <Route path="/weekly-payment" element={<WeeklyPayment />} />
-            <Route path="/report" element={<MonthlyReport />} />
-          </Routes>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <Navigation onSignOut={onSignOut} />
+      <div className="pb-16 lg:pb-0">
+        <Routes>
+          <Route path="/" element={<Navigate to="/monthly-balance" replace />} />
+          <Route path="/monthly-balance" element={<MonthlyBalance />} />
+          <Route path="/daily-expense" element={<DailyExpense />} />
+          <Route path="/weekly-payment" element={<WeeklyPayment />} />
+          <Route path="/report" element={<MonthlyReport />} />
+        </Routes>
       </div>
-    </BrowserRouter>
+    </div>
   );
 }
 
